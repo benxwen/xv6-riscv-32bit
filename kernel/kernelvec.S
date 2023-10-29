@@ -11,7 +11,7 @@
 .align 4
 kernelvec:
         # make room to save registers.
-        addi sp, sp, -256
+        addi sp, sp, -128
 
         # save the registers.
         sd ra, 0(sp)
