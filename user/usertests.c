@@ -32,10 +32,10 @@ char buf[BUFSZ];
 void
 copyin(char *s)
 {
-  uint64 addrs[] = { 0x80000000LL, 0xffffffffffffffff };
+  uint32 addrs[] = { 0x80000000, 0xffffffff };
 
   for(int ai = 0; ai < 2; ai++){
-    uint64 addr = addrs[ai];
+    uint32 addr = addrs[ai];
     
     int fd = open("copyin1", O_CREATE|O_WRONLY);
     if(fd < 0){
@@ -76,10 +76,10 @@ copyin(char *s)
 void
 copyout(char *s)
 {
-  uint64 addrs[] = { 0x80000000LL, 0xffffffffffffffff };
+  uint32 addrs[] = { 0x80000000, 0xffffffff };
 
   for(int ai = 0; ai < 2; ai++){
-    uint64 addr = addrs[ai];
+    uint32 addr = addrs[ai];
 
     int fd = open("README", 0);
     if(fd < 0){
@@ -117,10 +117,10 @@ copyout(char *s)
 void
 copyinstr1(char *s)
 {
-  uint64 addrs[] = { 0x80000000LL, 0xffffffffffffffff };
+  uint32 addrs[] = { 0x80000000, 0xffffffff };
 
   for(int ai = 0; ai < 2; ai++){
-    uint64 addr = addrs[ai];
+    uint32 addr = addrs[ai];
 
     int fd = open((char *)addr, O_CREATE|O_WRONLY);
     if(fd >= 0){
@@ -199,11 +199,11 @@ void
 copyinstr3(char *s)
 {
   sbrk(8192);
-  uint64 top = (uint64) sbrk(0);
+  uint32 top = (uint32) sbrk(0);
   if((top % PGSIZE) != 0){
     sbrk(PGSIZE - (top % PGSIZE));
   }
-  top = (uint64) sbrk(0);
+  top = (uint32) sbrk(0);
   if(top % PGSIZE){
     printf("oops\n");
     exit(1);
@@ -245,14 +245,14 @@ rwsbrk()
 {
   int fd, n;
   
-  uint64 a = (uint64) sbrk(8192);
+  uint32 a = (uint32) sbrk(8192);
 
-  if(a == 0xffffffffffffffffLL) {
+  if(a == 0xffffffff) {
     printf("sbrk(rwsbrk) failed\n");
     exit(1);
   }
   
-  if ((uint64) sbrk(-8192) ==  0xffffffffffffffffLL) {
+  if ((uint32) sbrk(-8192) ==  0xffffffff) {
     printf("sbrk(rwsbrk) shrink failed\n");
     exit(1);
   }
@@ -2008,7 +2008,7 @@ sbrkbasic(char *s)
   }
   if(pid == 0){
     a = sbrk(TOOMUCH);
-    if(a == (char*)0xffffffffffffffffL){
+    if(a == (char*)0xffffffff){
       // it's OK if this fails.
       exit(0);
     }
@@ -2062,13 +2062,13 @@ sbrkmuch(char *s)
 {
   enum { BIG=100*1024*1024 };
   char *c, *oldbrk, *a, *lastaddr, *p;
-  uint64 amt;
+  uint32 amt;
 
   oldbrk = sbrk(0);
 
   // can one grow address space to something big?
   a = sbrk(0);
-  amt = BIG - (uint64)a;
+  amt = BIG - (uint32)a;
   p = sbrk(amt);
   if (p != a) {
     printf("%s: sbrk test failed to grow big address space; enough phys mem?\n", s);
@@ -2086,7 +2086,7 @@ sbrkmuch(char *s)
   // can one de-allocate?
   a = sbrk(0);
   c = sbrk(-PGSIZE);
-  if(c == (char*)0xffffffffffffffffL){
+  if(c == (char*)0xffffffff){
     printf("%s: sbrk could not deallocate\n", s);
     exit(1);
   }
@@ -2145,7 +2145,7 @@ kernmem(char *s)
 void
 MAXVAplus(char *s)
 {
-  volatile uint64 a = MAXVA;
+  volatile uint32 a = MAXVA;
   for( ; a != 0; a <<= 1){
     int pid;
     pid = fork();
@@ -2185,7 +2185,7 @@ sbrkfail(char *s)
   for(i = 0; i < sizeof(pids)/sizeof(pids[0]); i++){
     if((pids[i] = fork()) == 0){
       // allocate a lot of memory
-      sbrk(BIG - (uint64)sbrk(0));
+      sbrk(BIG - (uint32)sbrk(0));
       write(fds[1], "x", 1);
       // sit around until killed
       for(;;) sleep(1000);
@@ -2203,7 +2203,7 @@ sbrkfail(char *s)
     kill(pids[i]);
     wait(0);
   }
-  if(c == (char*)0xffffffffffffffffL){
+  if(c == (char*)0xffffffff){
     printf("%s: failed sbrk leaked memory\n", s);
     exit(1);
   }
@@ -2267,7 +2267,7 @@ void
 validatetest(char *s)
 {
   int hi;
-  uint64 p;
+  uint32 p;
 
   hi = 1100*1024;
   for(p = 0; p <= (uint)hi; p += PGSIZE){
@@ -2471,7 +2471,7 @@ sbrkbugs(char *s)
     exit(1);
   }
   if(pid == 0){
-    int sz = (uint64) sbrk(0);
+    int sz = (uint32) sbrk(0);
     // free all user memory; there used to be a bug that
     // would not adjust p->sz correctly in this case,
     // causing exit() to panic.
@@ -2487,7 +2487,7 @@ sbrkbugs(char *s)
     exit(1);
   }
   if(pid == 0){
-    int sz = (uint64) sbrk(0);
+    int sz = (uint32) sbrk(0);
     // set the break to somewhere in the very first
     // page; there used to be a bug that would incorrectly
     // free the first page.
@@ -2503,7 +2503,7 @@ sbrkbugs(char *s)
   }
   if(pid == 0){
     // set the break in the middle of a page.
-    sbrk((10*4096 + 2048) - (uint64)sbrk(0));
+    sbrk((10*4096 + 2048) - (uint32)sbrk(0));
 
     // reduce the break a bit, but not enough to
     // cause a page to be freed. this used to cause
@@ -2523,13 +2523,13 @@ sbrkbugs(char *s)
 void
 sbrklast(char *s)
 {
-  uint64 top = (uint64) sbrk(0);
+  uint32 top = (uint32) sbrk(0);
   if((top % 4096) != 0)
     sbrk(4096 - (top % 4096));
   sbrk(4096);
   sbrk(10);
   sbrk(-20);
-  top = (uint64) sbrk(0);
+  top = (uint32) sbrk(0);
   char *p = (char *) (top - 64);
   p[0] = 'x';
   p[1] = '\0';
@@ -2755,7 +2755,7 @@ badwrite(char *s)
       printf("open junk failed\n");
       exit(1);
     }
-    write(fd, (char*)0xffffffffffL, 1);
+    write(fd, (char*)0xfffffffL, 1);
     close(fd);
     unlink("junk");
   }
@@ -2789,8 +2789,8 @@ execout(char *s)
     } else if(pid == 0){
       // allocate all of memory.
       while(1){
-        uint64 a = (uint64) sbrk(4096);
-        if(a == 0xffffffffffffffffLL)
+        uint32 a = (uint32) sbrk(4096);
+        if(a == 0xffffffff)
           break;
         *(char*)(a + 4096 - 1) = 1;
       }
@@ -3005,8 +3005,8 @@ countfree()
     close(fds[0]);
     
     while(1){
-      uint64 a = (uint64) sbrk(4096);
-      if(a == 0xffffffffffffffff){
+      uint32 a = (uint32) sbrk(4096);
+      if(a == 0xffffffff){
         break;
       }
 
