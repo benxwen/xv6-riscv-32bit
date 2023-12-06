@@ -28,11 +28,11 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/sdcard.o \
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
-#TOOLPREFIX = 
+# TOOLPREFIX = /opt/riscv/bin/riscv64-unknown-elf-
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
@@ -50,20 +50,18 @@ endif
 
 LIBGCC = /opt/riscv/lib/gcc/riscv64-unknown-elf/13.2.0/rv32i/ilp32
 
-QEMU = qemu-system-riscv64
-
 CC = $(TOOLPREFIX)gcc
 AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer # -ggdb -gdwarf-2
 CFLAGS += -march=rv32ia_zicsr
 CFLAGS += -mabi=ilp32
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
-CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
+CFLAGS += -ffreestanding -fcommon -nostdlib -mno-relax
 CFLAGS += -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
@@ -83,7 +81,7 @@ $K/kernel: $(OBJS) $K/kernel.ld $U/initcode
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 
 $U/initcode: $U/initcode.S
-	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
+	$(CC) $(CFLAGS) -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o  -L$(LIBGCC) -lgcc
 	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
 	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
@@ -91,10 +89,19 @@ $U/initcode: $U/initcode.S
 tags: $(OBJS) _init
 	etags *.S *.c
 
+$K/entry.o:	$K/entry.S
+	$(CC) $(CFLAGS) -c -o $K/entry.o $K/entry.S
+$K/swtch.o:	$K/swtch.S
+	$(CC) $(CFLAGS) -c -o $K/swtch.o $K/swtch.S
+$K/trampoline.o:	$K/trampoline.S
+	$(CC) $(CFLAGS) -c -o $K/trampoline.o $K/trampoline.S
+$K/kernelvec.o:	$K/kernelvec.S
+	$(CC) $(CFLAGS) -c -o $K/kernelvec.o $K/kernelvec.S
+
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $^
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^ -L$(LIBGCC) -lgcc -s
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
@@ -138,40 +145,19 @@ UPROGS=\
 	$U/_zombie\
 
 fs.img: mkfs/mkfs README $(UPROGS)
-	mkfs/mkfs fs.img README $(UPROGS)
+	cp kernel/kernel xv6.elf
+	mkfs/mkfs fs.img xv6.elf README $(UPROGS)
 
 -include kernel/*.d user/*.d
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
-	$U/initcode $U/initcode.out $K/kernel fs.img \
+	$U/initcode $U/initcode.out $K/kernel xv6.elf fs.img \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	$(UPROGS)
 
-# try to generate a unique GDB port
-GDBPORT = $(shell expr `id -u` % 5000 + 25000)
-# QEMU's gdb stub command line changed in 0.11
-QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
-	then echo "-gdb tcp::$(GDBPORT)"; \
-	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
 CPUS := 1
 endif
-
-QEMUOPTS = -machine virt -bios none -kernel $K/kernel -m 128M -smp $(CPUS) -nographic
-QEMUOPTS += -global virtio-mmio.force-legacy=false
-QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0
-QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-
-qemu: $K/kernel fs.img
-	$(QEMU) $(QEMUOPTS)
-
-.gdbinit: .gdbinit.tmpl-riscv
-	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
-
-qemu-gdb: $K/kernel .gdbinit fs.img
-	@echo "*** Now run 'gdb' in another window." 1>&2
-	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
-

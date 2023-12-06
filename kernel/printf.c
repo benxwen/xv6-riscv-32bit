@@ -130,6 +130,7 @@ panic(char *s)
 void
 printfinit(void)
 {
+  panicked = 0;
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }

@@ -109,7 +109,7 @@ bwrite(struct buf *b)
 {
   if(!holdingsleep(&b->lock))
     panic("bwrite");
-    spi_wb(b->blockno,b->data);
+  spi_wb(b->blockno,b->data);
 }
 
 // Release a locked buffer.
