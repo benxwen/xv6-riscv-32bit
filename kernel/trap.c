@@ -179,7 +179,7 @@ devintr()
 {
   uint32 scause = r_scause();
 
-  if((scause & 0x8000000000000000L) &&
+  if((scause & 0x80000000L) &&
      (scause & 0xff) == 9){
     // this is a supervisor external interrupt, via PLIC.
 
@@ -188,8 +188,8 @@ devintr()
 
     if(irq == UART0_IRQ){
       uartintr();
-    } else if(irq == VIRTIO0_IRQ){
-      virtio_disk_intr();
+//    } else if(irq == VIRTIO0_IRQ){
+//      virtio_disk_intr();
     } else if(irq){
       printf("unexpected interrupt irq=%d\n", irq);
     }
@@ -201,7 +201,7 @@ devintr()
       plic_complete(irq);
 
     return 1;
-  } else if(scause == 0x8000000000000001L){
+  } else if(scause == 0x80000001L){
     // software interrupt from a machine-mode timer interrupt,
     // forwarded by timervec in kernelvec.S.
 

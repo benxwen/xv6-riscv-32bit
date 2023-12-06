@@ -42,8 +42,8 @@
 struct spinlock uart_tx_lock;
 #define UART_TX_BUF_SIZE 32
 char uart_tx_buf[UART_TX_BUF_SIZE];
-uint64 uart_tx_w; // write next to uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE]
-uint64 uart_tx_r; // read next from uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE]
+uint32 uart_tx_w; // write next to uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE]
+uint32 uart_tx_r; // read next from uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE]
 
 extern volatile int panicked; // from printf.c
 
@@ -54,22 +54,22 @@ uartinit(void)
 {
   // disable interrupts.
   WriteReg(IER, 0x00);
-
+  
   // special mode to set baud rate.
   WriteReg(LCR, LCR_BAUD_LATCH);
 
   // LSB for baud rate of 38.4K.
-  WriteReg(0, 0x03);
+  WriteReg(0, 32000000/115200 & 0xff);
 
   // MSB for baud rate of 38.4K.
-  WriteReg(1, 0x00);
+  WriteReg(1, 32000000/115200 >> 8);
 
   // leave set-baud mode,
   // and set word length to 8 bits, no parity.
-  WriteReg(LCR, LCR_EIGHT_BITS);
+  WriteReg(LCR, 0x00);
 
   // reset and enable FIFOs.
-  WriteReg(FCR, FCR_FIFO_ENABLE | FCR_FIFO_CLEAR);
+  WriteReg(FCR, 0x07);
 
   // enable transmit and receive interrupts.
   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
@@ -136,6 +136,7 @@ uartstart()
   while(1){
     if(uart_tx_w == uart_tx_r){
       // transmit buffer is empty.
+      ReadReg(ISR);
       return;
     }
     
@@ -188,3 +189,4 @@ uartintr(void)
   uartstart();
   release(&uart_tx_lock);
 }
+

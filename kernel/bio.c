@@ -22,6 +22,7 @@
 #include "defs.h"
 #include "fs.h"
 #include "buf.h"
+#include "sdcard.h"
 
 struct {
   struct spinlock lock;
@@ -96,7 +97,7 @@ bread(uint dev, uint blockno)
 
   b = bget(dev, blockno);
   if(!b->valid) {
-    virtio_disk_rw(b, 0);
+    spi_rb(b->blockno,b->data);
     b->valid = 1;
   }
   return b;
@@ -108,7 +109,7 @@ bwrite(struct buf *b)
 {
   if(!holdingsleep(&b->lock))
     panic("bwrite");
-  virtio_disk_rw(b, 1);
+    spi_wb(b->blockno,b->data);
 }
 
 // Release a locked buffer.
