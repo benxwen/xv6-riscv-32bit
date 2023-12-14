@@ -85,7 +85,7 @@ kvminithart()
 pte_t *
 walk(pagetable_t pagetable, uint32 va, int alloc)
 {
-  if(va >= MAXVA)
+  if(va > MAXVA)
     panic("walk");
 
   for(int level = 1; level > 0; level--) {
@@ -111,7 +111,7 @@ walkaddr(pagetable_t pagetable, uint32 va)
   pte_t *pte;
   uint32 pa;
 
-  if(va >= MAXVA)
+  if(va > MAXVA)
     return 0;
 
   pte = walk(pagetable, va, 0);
